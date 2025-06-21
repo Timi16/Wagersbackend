@@ -85,6 +85,56 @@ export const signin = async (req, res) => {
 };
 
 /**
+ * Verify token - handles the /api/auth/verify route that your frontend calls
+ */
+export const verifyToken = async (req, res) => {
+  try {
+    // Extract token from Authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: 'No token provided' });
+    }
+
+    const token = authHeader.substring(7);
+    
+    // Check if token is invalidated
+    const { isTokenInvalidated } = await import('../middleware/authMiddleware.js');
+    if (isTokenInvalidated(token)) {
+      return res.status(401).json({ message: 'Token has been invalidated' });
+    }
+
+    // Verify JWT token
+    const secret = process.env.JWT_SECRET || 'mysecretkey';
+    const decoded = jwt.verify(token, secret);
+    
+    // Get user from database
+    const user = await User.findByPk(decoded.id);
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+
+    // Return user data (matching frontend expectations)
+    return res.status(200).json({
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email
+      }
+    });
+  } catch (err) {
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token expired' });
+    }
+    
+    console.error('Token verification error:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/**
  * Sign out user
  */
 export const signout = async (req, res) => {
