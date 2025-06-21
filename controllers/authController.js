@@ -1,7 +1,15 @@
 import User from '../models/User.js';
 
 export const signup = async (req, res) => {
+  if (!req.body || typeof req.body !== 'object') {
+    return res.status(400).json({ message: 'Invalid request body' });
+  }
+
   const { username, email, password } = req.body;
+  if (!username || !email || !password) {
+    return res.status(400).json({ message: 'All fields are required: username, email, password' });
+  }
+
   try {
     const existing = await User.findOne({ where: { email } });
     if (existing) {
