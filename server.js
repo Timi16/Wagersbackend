@@ -1,10 +1,15 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import cors from 'cors';
 import sequelize from './config/database.js';
 import authRoutes from './routes/authRoutes.js';
 
 dotenv.config();
 const app = express();
+
+// middleware
+app.use(cors());
+app.use(express.json());
 
 // sync database
 sequelize.sync({ alter: true })
