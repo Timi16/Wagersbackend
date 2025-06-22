@@ -1,5 +1,5 @@
 import express from 'express';
-import { signup, signin, signout, verifyToken } from '../controllers/authController.js';
+import { signup, signin, signout, verifyToken,getProfile } from '../controllers/authController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -8,6 +8,7 @@ const router = express.Router();
 router.post('/signup', signup);
 router.post('/signin', signin);
 router.post('/signout', signout);
+router.get("/profile", getProfile);
 
 // Token verification route (used by frontend auth service)
 router.get('/verify', verifyToken);

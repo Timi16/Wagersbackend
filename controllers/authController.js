@@ -71,8 +71,11 @@ export const signup = async (req, res) => {
     }
 
     // Update user with Paystack customer code and phone number
-    await user.update({ 
+    await user.update({
       paystackCustomerCode: customerCode,
+      virtualAccountNumber: dvaData.data.account_number,
+      virtualAccountBank: dvaData.data.bank.name,
+      virtualAccountName: dvaData.data.account_name,
     });
 
     // Send success response
@@ -82,7 +85,9 @@ export const signup = async (req, res) => {
         id: user.id, 
         username, 
         email, 
-        customerCode
+        customerCode,
+        virtualAccountNumber,
+        virtualAccountBank,
       },
     });
   } catch (err) {
@@ -179,6 +184,31 @@ export const verifyToken = async (req, res) => {
     }
     
     console.error('Token verification error:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const getProfile = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id, {
+      attributes: ['id', 'username', 'email', 'balance', 'virtualAccountNumber', 'virtualAccountBank', 'virtualAccountName'],
+    });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    return res.status(200).json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      balance: user.balance,
+      virtualAccount: {
+        accountNumber: user.virtualAccountNumber,
+        bankName: user.virtualAccountBank,
+        accountName: user.virtualAccountName,
+      },
+    });
+  } catch (err) {
+    console.error('Get profile error:', err);
     return res.status(500).json({ message: 'Server error' });
   }
 };
