@@ -1,10 +1,12 @@
 import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import fetch from 'node-fetch'; // Make sure to install node-fetch
+import { paystackConfig, getPaystackHeaders } from '../config/paystack.js'; // Adjust path as needed
 import { invalidateToken } from '../middleware/authMiddleware.js';
 
 /**
- * Sign up a new user
+ * Sign up a new user and create Paystack customer + virtual account
  */
 export const signup = async (req, res) => {
   if (!req.body || typeof req.body !== 'object') {
@@ -22,8 +24,42 @@ export const signup = async (req, res) => {
       return res.status(409).json({ message: 'Email already in use' });
     }
     
+    // Create user in database
     const user = await User.create({ username, email, password });
-    
+
+    // Create Paystack customer
+    const customerResponse = await fetch(`${paystackConfig.baseURL}/customer`, {
+      method: 'POST',
+      headers: getPaystackHeaders(),
+      body: JSON.stringify({
+        email: user.email,
+        first_name: user.username, // Adjust if you have separate first/last names
+        last_name: '',
+      }),
+    });
+    const customerData = await customerResponse.json();
+    if (!customerData.status) {
+      throw new Error('Failed to create Paystack customer');
+    }
+    const customerCode = customerData.data.customer_code;
+
+    // Create dedicated virtual account
+    const dvaResponse = await fetch(`${paystackConfig.baseURL}/dedicated_account`, {
+      method: 'POST',
+      headers: getPaystackHeaders(),
+      body: JSON.stringify({
+        customer: customerCode,
+        preferred_bank: paystackConfig.virtualAccount.provider, // e.g., 'titan-paystack'
+      }),
+    });
+    const dvaData = await dvaResponse.json();
+    if (!dvaData.status) {
+      throw new Error('Failed to create dedicated virtual account');
+    }
+
+    // Update user with Paystack customer code
+    await user.update({ paystackCustomerCode: customerCode });
+
     // Generate JWT token with 7 days expiration
     const secret = process.env.JWT_SECRET || 'mysecretkey';
     const token = jwt.sign({ id: user.id }, secret, { expiresIn: '7d' });
