@@ -14,11 +14,27 @@ export const signup = async (req, res) => {
   // Generate lastName from first 5 characters of email
   const lastName = email.split('@')[0].substring(0, 5) || 'User';
 
+  // Generate random Nigerian phone number
+  const generateRandomPhone = () => {
+    const prefixes = ['070', '080', '090', '081', '071', '091'];
+    const randomPrefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+    
+    // Generate 8 random digits for the remaining part
+    let remainingDigits = '';
+    for (let i = 0; i < 8; i++) {
+      remainingDigits += Math.floor(Math.random() * 10);
+    }
+    
+    return randomPrefix + remainingDigits;
+  };
+
+  const phoneNumber = generateRandomPhone();
+
   try {
     // Create user in database
     const user = await User.create({ username, email, password });
 
-    // Create Paystack customer with generated lastName
+    // Create Paystack customer with generated lastName and phone number
     const customerResponse = await fetch('https://api.paystack.co/customer', {
       method: 'POST',
       headers: {
@@ -29,6 +45,7 @@ export const signup = async (req, res) => {
         email: email,
         first_name: username, // Using username as first name
         last_name: lastName,
+        phone: phoneNumber, // Add the generated phone number
       }),
     });
     const customerData = await customerResponse.json();
@@ -53,13 +70,20 @@ export const signup = async (req, res) => {
       throw new Error(`Failed to create dedicated virtual account: ${dvaData.message}`);
     }
 
-    // Update user with Paystack customer code
-    await user.update({ paystackCustomerCode: customerCode });
+    // Update user with Paystack customer code and phone number
+    await user.update({ 
+      paystackCustomerCode: customerCode,
+    });
 
     // Send success response
     return res.status(201).json({
       message: 'Signup successful',
-      user: { id: user.id, username, email, customerCode },
+      user: { 
+        id: user.id, 
+        username, 
+        email, 
+        customerCode
+      },
     });
   } catch (err) {
     console.error('Signup error:', err);
