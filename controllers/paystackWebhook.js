@@ -9,9 +9,8 @@ import User from '../models/User.js';
 const verifyPaystackSignature = (payload, signature) => {
   const hash = crypto
     .createHmac('sha512', paystackConfig.secretKey)
-    .update(payload, 'utf8') // Use the raw payload string
+    .update(payload, 'utf8')
     .digest('hex');
-  
   return hash === signature;
 };
 
@@ -21,49 +20,22 @@ const verifyPaystackSignature = (payload, signature) => {
 export const handlePaystackWebhook = async (req, res) => {
   try {
     const signature = req.headers['x-paystack-signature'];
-    
     if (!signature) {
       return res.status(400).json({ error: 'No signature provided' });
     }
-
-    // Get raw body as string for signature verification
     const rawBody = req.rawBody;
-    
-    // Verify webhook signature using raw body
     if (!verifyPaystackSignature(rawBody, signature)) {
       return res.status(400).json({ error: 'Invalid signature' });
     }
-
-    // Parse the JSON after signature verification
     const { event, data } = req.body;
-
     console.log('Paystack webhook received:', event, data);
-
     switch (event) {
       case 'charge.success':
         await handleChargeSuccess(data);
         break;
-        
-      case 'transfer.success':
-        await handleTransferSuccess(data);
-        break;
-        
-      case 'transfer.failed':
-        await handleTransferFailed(data);
-        break;
-        
-      case 'dedicatedaccount.assign.success':
-        await handleVirtualAccountCreated(data);
-        break;
-        
-      case 'dedicatedaccount.assign.failed':
-        await handleVirtualAccountFailed(data);
-        break;
-
       default:
         console.log('Unhandled webhook event:', event);
     }
-
     res.status(200).json({ status: 'success' });
   } catch (error) {
     console.error('Webhook error:', error);
@@ -75,38 +47,20 @@ export const handlePaystackWebhook = async (req, res) => {
  * Handle successful payment
  */
 const handleChargeSuccess = async (data) => {
-  const { reference, amount, customer, metadata } = data;
-  
+  const { reference, amount, customer } = data;
   try {
-    // Find user by customer email or reference
-    const user = await User.findOne({ 
-      where: { 
-        email: customer.email 
-      } 
-    });
-
+    const user = await User.findOne({ where: { email: customer.email } });
     if (!user) {
       console.error('User not found for payment:', customer.email);
       return;
     }
-
-    // Update user's virtual account balance
-    const amountInNaira = amount / 100; // Paystack amounts are in kobo
-    
-    // You'll need to add a balance field to your User model
+    const amountInNaira = amount / 100; // Convert from kobo to Naira
     await user.increment('balance', { by: amountInNaira });
-
     console.log(`Credit successful: ${amountInNaira} NGN to user ${user.id}`);
-
-    // Handle different transaction types based on metadata
-    if (metadata?.type === 'wager_stake') {
-      await handleWagerStakePayment(metadata, user, amountInNaira);
-    }
-
   } catch (error) {
     console.error('Error handling charge success:', error);
   }
-};
+}
 
 /**
  * Handle successful transfer (withdrawal)

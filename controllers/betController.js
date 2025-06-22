@@ -1,6 +1,6 @@
-// controllers/betController.js
 import Bet from '../models/Bet.js';
 import Wager from '../models/Wager.js';
+import User from '../models/User.js';
 
 export const placeBet = async (req, res) => {
   const { wagerId, choice, stake } = req.body;
@@ -36,6 +36,18 @@ export const placeBet = async (req, res) => {
     if (wager.stakeType === 'open' && (stake < wager.minStake || stake > wager.maxStake)) {
       return res.status(400).json({ message: `Stake must be between ${wager.minStake} and ${wager.maxStake}` });
     }
+
+    // Check user's balance
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (user.balance < stake) {
+      return res.status(400).json({ message: 'Insufficient balance' });
+    }
+
+    // Deduct stake from user's balance
+    await user.decrement('balance', { by: stake });
 
     // Create the bet
     const bet = await Bet.create({
