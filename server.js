@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import sequelize from './config/database.js';
 import authRoutes from './routes/authRoutes.js';
-
+import webhookRoutes from './routes/webhook.js';
 dotenv.config();
 const app = express();
 
@@ -18,6 +18,7 @@ sequelize.sync({ alter: true })
 
 // mount routes
 app.use('/api/auth', authRoutes);
+app.use('/api/webhook', webhookRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

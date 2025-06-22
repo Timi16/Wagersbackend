@@ -101,13 +101,7 @@ Wager.init({
     type: DataTypes.DATE,
     allowNull: true,
   },
-  webhookUrl: {
-    type: DataTypes.STRING,
-    allowNull: true,
-    validate: {
-      isUrl: true,
-    },
-  },
+
 }, {
   sequelize,
   modelName: 'Wager',
