@@ -70,12 +70,17 @@ export const signup = async (req, res) => {
       throw new Error(`Failed to create dedicated virtual account: ${dvaData.message}`);
     }
 
-    // Update user with Paystack customer code and phone number
+    // Extract virtual account details
+    const virtualAccountNumber = dvaData.data.account_number;
+    const virtualAccountBank = dvaData.data.bank.name;
+    const virtualAccountName = dvaData.data.account_name;
+
+    // Update user with Paystack customer code and virtual account details
     await user.update({
       paystackCustomerCode: customerCode,
-      virtualAccountNumber: dvaData.data.account_number,
-      virtualAccountBank: dvaData.data.bank.name,
-      virtualAccountName: dvaData.data.account_name,
+      virtualAccountNumber: virtualAccountNumber,
+      virtualAccountBank: virtualAccountBank,
+      virtualAccountName: virtualAccountName,
     });
 
     // Send success response
@@ -95,6 +100,7 @@ export const signup = async (req, res) => {
     return res.status(500).json({ message: `Server error: ${err.message}` });
   }
 };
+
 /**
  * Sign in existing user
  */
