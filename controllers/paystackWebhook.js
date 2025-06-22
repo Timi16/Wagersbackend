@@ -1,4 +1,3 @@
-// controllers/paystackWebhook.js
 import crypto from 'crypto';
 import { paystackConfig } from '../config/paystack.js';
 import User from '../models/User.js';
@@ -9,8 +8,8 @@ import User from '../models/User.js';
  */
 const verifyPaystackSignature = (payload, signature) => {
   const hash = crypto
-    .createHmac('sha512', paystackConfig.secretKey) // Use secret key directly
-    .update(JSON.stringify(payload))
+    .createHmac('sha512', paystackConfig.secretKey)
+    .update(payload, 'utf8') // Use the raw payload string
     .digest('hex');
   
   return hash === signature;
@@ -27,11 +26,15 @@ export const handlePaystackWebhook = async (req, res) => {
       return res.status(400).json({ error: 'No signature provided' });
     }
 
-    // Verify webhook signature
-    if (!verifyPaystackSignature(req.body, signature)) {
+    // Get raw body as string for signature verification
+    const rawBody = req.rawBody;
+    
+    // Verify webhook signature using raw body
+    if (!verifyPaystackSignature(rawBody, signature)) {
       return res.status(400).json({ error: 'Invalid signature' });
     }
 
+    // Parse the JSON after signature verification
     const { event, data } = req.body;
 
     console.log('Paystack webhook received:', event, data);

@@ -1,3 +1,4 @@
+// models/User.js (Updated)
 import { DataTypes, Model } from 'sequelize';
 import bcrypt from 'bcrypt';
 import sequelize from '../config/database.js';
@@ -29,6 +30,41 @@ User.init({
     type: DataTypes.STRING,
     allowNull: false,
   },
+  // Virtual Account & Wallet Fields
+  balance: {
+    type: DataTypes.DECIMAL(12, 2),
+    defaultValue: 0.00,
+    allowNull: false,
+  },
+  virtualAccountNumber: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  virtualAccountBank: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  virtualAccountName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  paystackCustomerCode: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  // Betting Stats (for leaderboard)
+  totalBets: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  totalWins: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  totalAmount: {
+    type: DataTypes.DECIMAL(12, 2),
+    defaultValue: 0.00,
+  },
 }, {
   sequelize,
   modelName: 'User',
@@ -37,6 +73,12 @@ User.init({
     beforeCreate: async (user) => {
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(user.password, salt);
+    }
+  },
+  // Add virtual fields for calculated stats
+  getterMethods: {
+    winRate() {
+      return this.totalBets > 0 ? (this.totalWins / this.totalBets * 100).toFixed(2) : 0;
     }
   }
 });
