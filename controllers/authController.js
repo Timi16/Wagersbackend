@@ -9,74 +9,63 @@ import { invalidateToken } from '../middleware/authMiddleware.js';
  * Sign up a new user and create Paystack customer + virtual account
  */
 export const signup = async (req, res) => {
-  if (!req.body || typeof req.body !== 'object') {
-    return res.status(400).json({ message: 'Invalid request body' });
-  }
-
   const { username, email, password } = req.body;
-  if (!username || !email || !password) {
-    return res.status(400).json({ message: 'All fields are required: username, email, password' });
-  }
+
+  // Generate lastName from first 5 characters of email
+  const lastName = email.split('@')[0].substring(0, 5) || 'User';
 
   try {
-    const existing = await User.findOne({ where: { email } });
-    if (existing) {
-      return res.status(409).json({ message: 'Email already in use' });
-    }
-    
     // Create user in database
     const user = await User.create({ username, email, password });
 
-    // Create Paystack customer
-    const customerResponse = await fetch(`${paystackConfig.baseURL}/customer`, {
+    // Create Paystack customer with generated lastName
+    const customerResponse = await fetch('https://api.paystack.co/customer', {
       method: 'POST',
-      headers: getPaystackHeaders(),
+      headers: {
+        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
-        email: user.email,
-        first_name: user.username, // Adjust if you have separate first/last names
-        last_name: '',
+        email: email,
+        first_name: username, // Using username as first name
+        last_name: lastName,
       }),
     });
     const customerData = await customerResponse.json();
     if (!customerData.status) {
-      throw new Error('Failed to create Paystack customer');
+      throw new Error(`Failed to create Paystack customer: ${customerData.message}`);
     }
     const customerCode = customerData.data.customer_code;
 
     // Create dedicated virtual account
-    const dvaResponse = await fetch(`${paystackConfig.baseURL}/dedicated_account`, {
+    const dvaResponse = await fetch('https://api.paystack.co/dedicated_account', {
       method: 'POST',
-      headers: getPaystackHeaders(),
+      headers: {
+        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         customer: customerCode,
-        preferred_bank: paystackConfig.virtualAccount.provider, // e.g., 'titan-paystack'
       }),
     });
     const dvaData = await dvaResponse.json();
     if (!dvaData.status) {
-      throw new Error('Failed to create dedicated virtual account');
+      throw new Error(`Failed to create dedicated virtual account: ${dvaData.message}`);
     }
 
     // Update user with Paystack customer code
     await user.update({ paystackCustomerCode: customerCode });
 
-    // Generate JWT token with 7 days expiration
-    const secret = process.env.JWT_SECRET || 'mysecretkey';
-    const token = jwt.sign({ id: user.id }, secret, { expiresIn: '7d' });
-    
-    // Return user details with token
-    return res.status(201).json({ 
-      id: user.id, 
-      username: user.username, 
-      email: user.email, 
-      token 
+    // Send success response
+    return res.status(201).json({
+      message: 'Signup successful',
+      user: { id: user.id, username, email, customerCode },
     });
   } catch (err) {
     console.error('Signup error:', err);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: `Server error: ${err.message}` });
   }
 };
-
 /**
  * Sign in existing user
  */
