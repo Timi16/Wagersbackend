@@ -317,6 +317,12 @@ export const resolveWager = async (req, res) => {
     const commission = totalPool * 0.10; // 10% commission
     const distributablePool = totalPool - commission;
 
+    // Save the commission
+    await Commission.create({
+      wagerId: wager.id,
+      amount: commission,
+    });
+
     const winningChoice = result;
     const winningBets = await Bet.findAll({
       where: {
