@@ -70,6 +70,7 @@ export const createWager = async (req, res) => {
       minStake: stakeType === 'open' ? minStake : null,
       maxStake: stakeType === 'open' ? maxStake : null,
       createdBy: req.user.id,
+      status: 'active', // Set wager to active by default
     });
 
     const wagerWithCreator = await Wager.findByPk(wager.id, {
