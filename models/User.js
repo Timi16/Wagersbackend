@@ -1,4 +1,3 @@
-// models/User.js (Updated)
 import { DataTypes, Model } from 'sequelize';
 import bcrypt from 'bcrypt';
 import sequelize from '../config/database.js';
@@ -30,7 +29,10 @@ User.init({
     type: DataTypes.STRING,
     allowNull: false,
   },
-  // Virtual Account & Wallet Fields
+  role: {
+    type: DataTypes.ENUM('user', 'admin'),
+    defaultValue: 'user',
+  },
   balance: {
     type: DataTypes.DECIMAL(12, 2),
     defaultValue: 0.00,
@@ -52,7 +54,6 @@ User.init({
     type: DataTypes.STRING,
     allowNull: true,
   },
-  // Betting Stats (for leaderboard)
   totalBets: {
     type: DataTypes.INTEGER,
     defaultValue: 0,
@@ -75,7 +76,6 @@ User.init({
       user.password = await bcrypt.hash(user.password, salt);
     }
   },
-  // Add virtual fields for calculated stats
   getterMethods: {
     winRate() {
       return this.totalBets > 0 ? (this.totalWins / this.totalBets * 100).toFixed(2) : 0;
