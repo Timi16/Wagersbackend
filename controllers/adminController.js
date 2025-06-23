@@ -1,4 +1,4 @@
-import { Commission} from '../models/Commission';
+import Commission from '../models/Commission.js';  // Fixed: default import + .js extension
 import fetch from 'node-fetch';
 
 export const transferCommission = async (req, res) => {

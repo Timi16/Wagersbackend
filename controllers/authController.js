@@ -249,3 +249,14 @@ export const setAdmin = async (req, res) => {
   await user.update({ role: "admin" });
   res.status(200).json({ message: "User set as admin" });
 };
+
+export const getBalance = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.status(200).json({ balance: user.balance });
+  } catch (err) {
+    console.error('Get balance error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

@@ -33,13 +33,31 @@ export const handlePaystackWebhook = async (req, res) => {
       case 'charge.success':
         await handleChargeSuccess(data);
         break;
+      case 'dedicated_account.inflow':
+        await handleInflow(data);
+        break;
       default:
-        console.log('Unhandled webhook event:', event);
+        console.log('Unhandled event:', event);
     }
     res.status(200).json({ status: 'success' });
   } catch (error) {
     console.error('Webhook error:', error);
     res.status(500).json({ error: 'Webhook processing failed' });
+  }
+};
+const handleInflow = async (data) => {
+  const { amount, customer } = data;
+  try {
+    const user = await User.findOne({ where: { email: customer.email } });
+    if (!user) {
+      console.error('User not found for inflow:', customer.email);
+      return;
+    }
+    const amountInNaira = amount / 100; // Convert from kobo to Naira
+    await user.increment('balance', { by: amountInNaira });
+    console.log(`Inflow successful: ${amountInNaira} NGN to user ${user.id}`);
+  } catch (error) {
+    console.error('Error handling inflow:', error);
   }
 };
 

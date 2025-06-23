@@ -1,5 +1,5 @@
 import express from 'express';
-import { signup, signin, signout, verifyToken,getProfile,setAdmin } from '../controllers/authController.js';
+import { signup, signin, signout, verifyToken,getProfile,setAdmin,getBalance } from '../controllers/authController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -13,6 +13,7 @@ router.get("/profile", getProfile);
 // Token verification route (used by frontend auth service)
 router.get('/verify', verifyToken);
 router.post('/set-admin',setAdmin)
+router.get('/balance', authenticateToken, getBalance);
 // Example of protected route using the middleware
 // router.get('/profile', authenticateToken, (req, res) => {
 //   res.json({ message: 'Protected route', user: req.user });
