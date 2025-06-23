@@ -1,5 +1,5 @@
 import express from 'express';
-import { transferCommission } from '../controllers/adminController.js';
+import {transferCommission} from '../controllers/adminController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
