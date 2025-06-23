@@ -196,12 +196,7 @@ export const verifyToken = async (req, res) => {
 
 export const getProfile = async (req, res) => {
   try {
-    const user = await User.findByPk(req.user.id, {
-      attributes: ['id', 'username', 'email', 'balance', 'virtualAccountNumber', 'virtualAccountBank', 'virtualAccountName'],
-    });
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+    const user = req.user; 
     return res.status(200).json({
       id: user.id,
       username: user.username,
@@ -218,7 +213,6 @@ export const getProfile = async (req, res) => {
     return res.status(500).json({ message: 'Server error' });
   }
 };
-
 /**
  * Sign out user
  */

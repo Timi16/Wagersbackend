@@ -1,35 +1,132 @@
-// generate-signature.js
-import crypto from 'crypto';
+import axios from "axios";
 
-// The exact payload you're sending
-const testPayload = `{"event":"charge.success","data":{"reference":"test_ref_12345","amount":1000000,"customer":{"email":"test@example.com"},"metadata":{"type":"wallet_funding"}}}`;
+// Set the base URL
+const baseUrl = 'https://2b3d-105-112-203-135.ngrok-free.app';
 
-// Your Paystack secret key
-const secretKey = 'sk_test_562208ae2579ae7d0cb8fcf017d5916ab15fffd3';
-
-// Generate the signature
-const signature = crypto
-  .createHmac('sha512', secretKey)
-  .update(testPayload, 'utf8')
-  .digest('hex');
-
-console.log('Payload:', testPayload);
-console.log('Generated signature:', signature);
-console.log('\n--- Windows CMD Command ---');
-console.log(`curl -X POST "https://b762-105-112-183-176.ngrok-free.app/api/webhook/paystack" -H "Content-Type: application/json" -H "x-paystack-signature: ${signature}" -d "{\\"event\\":\\"charge.success\\",\\"data\\":{\\"reference\\":\\"test_ref_12345\\",\\"amount\\":1000000,\\"customer\\":{\\"email\\":\\"test@example.com\\"},\\"metadata\\":{\\"type\\":\\"wallet_funding\\"}}}"`);
-
-console.log('\n--- PowerShell Command ---');
-console.log(`Invoke-RestMethod -Uri "https://b762-105-112-183-176.ngrok-free.app/api/webhook/paystack" -Method POST -Headers @{"Content-Type"="application/json"; "x-paystack-signature"="${signature}"} -Body '${testPayload}'`);
-
-// Test the signature verification function
-const verifySignature = (payload, signature, secret) => {
-  const hash = crypto
-    .createHmac('sha512', secret)
-    .update(payload, 'utf8')
-    .digest('hex');
-  
-  return hash === signature;
+// Generate unique admin credentials
+typeof window !== 'undefined';
+const timestamp = Date.now();
+const adminCredentials = {
+  username: `admin_${timestamp}`,
+  email: `admin_${timestamp}@example.com`,
+  password: 'Admin#1234',
 };
 
-console.log('\n--- Signature Verification Test ---');
-console.log('Signature valid:', verifySignature(testPayload, signature, secretKey));
+// Define bettor credentials (existing)
+const bettorCredentials = {
+  email: 'bettor@example.com',
+  password: 'bettorPass123',
+};
+
+async function createAdmin(credentials) {
+  // Create a new admin account
+  const res = await axios.post(
+    `${baseUrl}/api/auth/signup`,
+    credentials
+  );
+  console.log(`Admin created with ID: ${res.data.user.id}`);
+  return res.data.user.id;
+}
+
+async function signin(credentials, label) {
+  // Sign in and return token
+  const res = await axios.post(
+    `${baseUrl}/api/auth/signin`,
+    { email: credentials.email, password: credentials.password }
+  );
+  console.log(`${label} signed in, token: ${res.data.token}`);
+  return res.data.token;
+}
+
+async function fetchProfile(headers, label) {
+  // Fetch and log profile details
+  const res = await axios.get(
+    `${baseUrl}/api/auth/profile`,
+    { headers }
+  );
+  console.log(`${label} profile:`, res.data.user);
+  return res.data.user;
+}
+
+async function main() {
+  try {
+    // ===== ADMIN SETUP =====
+    const newAdminId = await createAdmin(adminCredentials);
+
+    const adminToken = await signin(adminCredentials, 'Admin');
+    const adminHeaders = {
+      Authorization: `Bearer ${adminToken}`,
+      'Content-Type': 'application/json',
+    };
+
+    // Fetch and log admin profile
+    await fetchProfile(adminHeaders, 'Admin');
+
+    // Ensure admin role
+    await axios.post(
+      `${baseUrl}/api/auth/set-admin`,
+      { userId: newAdminId },
+      { headers: adminHeaders }
+    );
+    console.log('Admin role assigned');
+
+    // ===== BETTOR SIGNIN =====
+    const bettorToken = await signin(bettorCredentials, 'Bettor');
+    const bettorHeaders = {
+      Authorization: `Bearer ${bettorToken}`,
+      'Content-Type': 'application/json',
+    };
+
+    // Fetch and log bettor profile
+    await fetchProfile(bettorHeaders, 'Bettor');
+
+    // ===== WAGER & BET =====
+    // Admin creates wager
+    const wagerPayload = {
+      title: 'Will it rain tomorrow?',
+      description: 'Bet on whether it will rain tomorrow.',
+      category: 'weather',
+      deadline: new Date(Date.now() + 24*60*60*1000).toISOString(), // 24h from now
+      stakeType: 'fixed',
+      fixedStake: 100,
+    };
+    const wagerRes = await axios.post(
+      `${baseUrl}/api/wagers`,
+      wagerPayload,
+      { headers: adminHeaders }
+    );
+    const wagerId = wagerRes.data.wager.id;
+    console.log(`Wager created with ID: ${wagerId}`);
+
+    // Bettor places bet
+    const betPayload = { choice: 'yes', stake: 100 };
+    await axios.post(
+      `${baseUrl}/api/wagers/${wagerId}/bet`,
+      betPayload,
+      { headers: bettorHeaders }
+    );
+    console.log('Bet placed by bettor');
+
+    // Admin resolves wager
+    const resolvePayload = { result: 'yes' };
+    await axios.post(
+      `${baseUrl}/api/wagers/${wagerId}/resolve`,
+      resolvePayload,
+      { headers: adminHeaders }
+    );
+    console.log('Wager resolved');
+
+    // Check balances
+    const [adminBalRes, bettorBalRes] = await Promise.all([
+      axios.get(`${baseUrl}/api/auth/balance`, { headers: adminHeaders }),
+      axios.get(`${baseUrl}/api/auth/balance`, { headers: bettorHeaders }),
+    ]);
+    console.log(`Admin balance: ${adminBalRes.data.balance}`);
+    console.log(`Bettor balance: ${bettorBalRes.data.balance}`);
+
+  } catch (error) {
+    console.error('Error:', error.response ? error.response.data : error.message);
+  }
+}
+
+main();

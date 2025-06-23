@@ -8,7 +8,7 @@ const router = express.Router();
 router.post('/signup', signup);
 router.post('/signin', signin);
 router.post('/signout', signout);
-router.get("/profile", getProfile);
+router.get("/profile",authenticateToken, getProfile);
 
 // Token verification route (used by frontend auth service)
 router.get('/verify', verifyToken);
