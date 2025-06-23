@@ -3,25 +3,29 @@ import Wager from '../models/Wager.js';
 import User from '../models/User.js';
 
 export const placeBet = async (req, res) => {
-  const { wagerId, choice, stake } = req.body;
-  const userId = req.user.id;
-
-  // Validate inputs
-  if (!wagerId || !choice || !stake) {
-    return res.status(400).json({ message: 'Missing required fields' });
-  }
-  if (!['yes', 'no'].includes(choice)) {
-    return res.status(400).json({ message: 'Invalid choice' });
-  }
-  if (isNaN(stake) || stake <= 0) {
-    return res.status(400).json({ message: 'Invalid stake amount' });
-  }
-
-  try {
-    const wager = await Wager.findByPk(wagerId);
-    if (!wager) {
-      return res.status(404).json({ message: 'Wager not found' });
+    const wagerId = req.params.id; // Get wagerId from URL parameter
+    const { choice, stake } = req.body; // Get choice and stake from request body
+    const userId = req.user.id; // Assuming token provides user ID
+  
+    // Validate inputs
+    if (!choice || !stake) {
+      return res.status(400).json({ message: 'Missing required fields' });
     }
+  
+    // Additional validation (optional, based on your setup)
+    if (!['yes', 'no'].includes(choice)) {
+      return res.status(400).json({ message: 'Invalid choice' });
+    }
+    if (isNaN(stake) || stake <= 0) {
+      return res.status(400).json({ message: 'Invalid stake amount' });
+    }
+  
+    try {
+      // Rest of the logic (e.g., checking wager, balance, creating bet)
+      const wager = await Wager.findByPk(wagerId);
+      if (!wager) {
+        return res.status(404).json({ message: 'Wager not found' });
+      }
     if (wager.status !== 'active') {
       return res.status(400).json({ message: 'Wager is not active' });
     }

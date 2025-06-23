@@ -1,4 +1,3 @@
-// routes/wagers.js
 import express from 'express';
 import { 
   createWager, 
@@ -6,9 +5,10 @@ import {
   getWager, 
   updateWager, 
   deleteWager, 
-  getWagersByCategory 
+  getWagersByCategory,
+  resolveWager
 } from '../controllers/wagerController.js';
-import { placeBet } from '../controllers/betController.js'; // Add this
+import { placeBet } from '../controllers/betController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -22,6 +22,7 @@ router.get('/:id', getWager);
 router.post('/', authenticateToken, createWager);
 router.put('/:id', authenticateToken, updateWager);
 router.delete('/:id', authenticateToken, deleteWager);
-router.post('/:id/bet', authenticateToken, placeBet); // Add this
+router.post('/:id/bet', authenticateToken, placeBet);
+router.post('/:id/resolve', authenticateToken, resolveWager);
 
 export default router;

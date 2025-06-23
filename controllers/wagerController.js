@@ -1,5 +1,7 @@
 import Wager from '../models/Wager.js';
 import User from '../models/User.js';
+import Bet from '../models/Bet.js';
+import { Op } from 'sequelize';
 
 /**
  * Create a new wager
@@ -19,7 +21,6 @@ export const createWager = async (req, res) => {
     fixedStake,
     minStake,
     maxStake,
-
   } = req.body;
 
   // Validation
@@ -29,7 +30,6 @@ export const createWager = async (req, res) => {
     });
   }
 
-  // Validate deadline is in the future
   const deadlineDate = new Date(deadline);
   if (deadlineDate <= new Date()) {
     return res.status(400).json({ 
@@ -37,7 +37,6 @@ export const createWager = async (req, res) => {
     });
   }
 
-  // Validate stake type requirements
   if (stakeType === 'fixed' && !fixedStake) {
     return res.status(400).json({ 
       message: 'Fixed stake amount is required for fixed stake type' 
@@ -68,10 +67,8 @@ export const createWager = async (req, res) => {
       minStake: stakeType === 'open' ? minStake : null,
       maxStake: stakeType === 'open' ? maxStake : null,
       createdBy: req.user.id,
-
     });
 
-    // Include creator information in response
     const wagerWithCreator = await Wager.findByPk(wager.id, {
       include: [{
         model: User,
@@ -100,7 +97,7 @@ export const getWagers = async (req, res) => {
     const where = {};
     if (category) where.category = category;
     if (status) where.status = status;
-    else where.status = 'active'; // Default to active wagers
+    else where.status = 'active';
 
     const offset = (page - 1) * limit;
 
@@ -158,7 +155,7 @@ export const getWager = async (req, res) => {
 };
 
 /**
- * Update wager (only by creator and before deadline)
+ * Update wager
  */
 export const updateWager = async (req, res) => {
   try {
@@ -170,22 +167,18 @@ export const updateWager = async (req, res) => {
       return res.status(404).json({ message: 'Wager not found' });
     }
 
-    // Check if user is the creator
     if (wager.createdBy !== req.user.id) {
       return res.status(403).json({ message: 'Only the creator can update this wager' });
     }
 
-    // Check if wager is still active and deadline hasn't passed
     if (wager.status !== 'active' || new Date() >= new Date(wager.deadline)) {
       return res.status(400).json({ message: 'Cannot update inactive or expired wager' });
     }
 
-    // Update only allowed fields
     const updates = {};
     if (title) updates.title = title;
     if (description) updates.description = description;
     if (tags) updates.tags = tags;
-
 
     await wager.update(updates);
 
@@ -208,7 +201,7 @@ export const updateWager = async (req, res) => {
 };
 
 /**
- * Delete/Cancel wager (only by creator and if no participants)
+ * Delete/Cancel wager
  */
 export const deleteWager = async (req, res) => {
   try {
@@ -219,12 +212,10 @@ export const deleteWager = async (req, res) => {
       return res.status(404).json({ message: 'Wager not found' });
     }
 
-    // Check if user is the creator
     if (wager.createdBy !== req.user.id) {
       return res.status(403).json({ message: 'Only the creator can delete this wager' });
     }
 
-    // Check if there are participants
     if (wager.participantCount > 0) {
       return res.status(400).json({ 
         message: 'Cannot delete wager with participants. Consider cancelling instead.' 
@@ -279,6 +270,78 @@ export const getWagersByCategory = async (req, res) => {
     });
   } catch (err) {
     console.error('Get wagers by category error:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/**
+ * Resolve a wager and distribute winnings
+ */
+export const resolveWager = async (req, res) => {
+  const { id } = req.params;
+  const { result } = req.body; // 'yes', 'no', or 'cancelled'
+
+  if (!['yes', 'no', 'cancelled'].includes(result)) {
+    return res.status(400).json({ message: 'Invalid result' });
+  }
+
+  try {
+    const wager = await Wager.findByPk(id);
+    if (!wager) {
+      return res.status(404).json({ message: 'Wager not found' });
+    }
+    if (wager.status !== 'active') {
+      return res.status(400).json({ message: 'Wager is not active' });
+    }
+    if (wager.createdBy !== req.user.id) {
+      return res.status(403).json({ message: 'Only the creator can resolve this wager' });
+    }
+
+    wager.result = result;
+    wager.status = 'resolved';
+    wager.resolvedAt = new Date();
+    await wager.save();
+
+    if (result === 'cancelled') {
+      const bets = await Bet.findAll({ where: { wagerId: id } });
+      for (const bet of bets) {
+        const user = await User.findByPk(bet.userId);
+        if (user) {
+          await user.increment('balance', { by: bet.stake });
+        }
+      }
+      return res.status(200).json({ message: 'Wager cancelled and stakes refunded' });
+    }
+
+    const totalPool = wager.totalPool;
+    const commission = totalPool * 0.10; // 10% commission
+    const distributablePool = totalPool - commission;
+
+    const winningChoice = result;
+    const winningBets = await Bet.findAll({
+      where: {
+        wagerId: id,
+        choice: winningChoice,
+      },
+    });
+
+    if (winningBets.length === 0) {
+      return res.status(200).json({ message: 'Wager resolved with no winners' });
+    }
+
+    const totalWinningStake = winningBets.reduce((sum, bet) => sum + bet.stake, 0);
+
+    for (const bet of winningBets) {
+      const user = await User.findByPk(bet.userId);
+      if (user) {
+        const winnings = (bet.stake / totalWinningStake) * distributablePool;
+        await user.increment('balance', { by: winnings });
+      }
+    }
+
+    return res.status(200).json({ message: 'Wager resolved and winnings distributed' });
+  } catch (err) {
+    console.error('Resolve wager error:', err);
     return res.status(500).json({ message: 'Server error' });
   }
 };
