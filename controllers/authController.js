@@ -242,3 +242,10 @@ export const signout = async (req, res) => {
     return res.status(500).json({ message: 'Server error' });
   }
 };
+export const setAdmin = async (req, res) => {
+  const { userId } = req.body;
+  const user = await User.findByPk(userId);
+  if (!user) return res.status(404).json({ message: "User not found" });
+  await user.update({ role: "admin" });
+  res.status(200).json({ message: "User set as admin" });
+};
