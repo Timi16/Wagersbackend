@@ -1,6 +1,9 @@
 import Wager from '../models/Wager.js';
 import User from '../models/User.js';
 import Bet from '../models/Bet.js';
+import Commission from '../models/Commission.js';
+// Import Commission model if you have it, or remove the Commission.create call
+// import Commission from '../models/Commission.js';
 import { Op } from 'sequelize';
 
 /**
@@ -293,8 +296,10 @@ export const resolveWager = async (req, res) => {
     if (wager.status !== 'active') {
       return res.status(400).json({ message: 'Wager is not active' });
     }
-    if (wager.createdBy !== req.user.id) {
-      return res.status(403).json({ message: 'Only the creator can resolve this wager' });
+    
+    // FIXED: Check if user has admin role
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only an admin can resolve this wager' });
     }
 
     wager.result = result;
@@ -317,11 +322,21 @@ export const resolveWager = async (req, res) => {
     const commission = totalPool * 0.10; // 10% commission
     const distributablePool = totalPool - commission;
 
-    // Save the commission
+    // Pay commission to the resolving admin's balance
+    const admin = await User.findByPk(req.user.id);
+    if (admin) {
+      await admin.increment('balance', { by: commission });
+    }
+
+    // FIXED: Only create Commission record if you have the model
+    // Comment out or remove if you don't have a Commission model
+    
     await Commission.create({
       wagerId: wager.id,
       amount: commission,
+      userId: req.user.id, // Log which admin received it
     });
+    
 
     const winningChoice = result;
     const winningBets = await Bet.findAll({

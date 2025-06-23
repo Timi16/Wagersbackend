@@ -31,11 +31,12 @@ export const authenticateToken = async (req, res, next) => {
       return res.status(401).json({ message: 'User not found' });
     }
 
-    // Add user to request object
+    // Add user to request object - INCLUDE ROLE
     req.user = {
       id: user.id,
       username: user.username,
-      email: user.email
+      email: user.email,
+      role: user.role // This was missing!
     };
     
     next();
@@ -80,12 +81,13 @@ export const verify = async (req, res) => {
       return res.status(401).json({ message: 'User not found' });
     }
 
-    // Return user data (matching frontend expectations)
+    // Return user data (matching frontend expectations) - INCLUDE ROLE
     return res.status(200).json({
       user: {
         id: user.id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        role: user.role // Include role in response too
       }
     });
   } catch (err) {

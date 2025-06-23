@@ -1,28 +1,63 @@
 import express from 'express';
-import dotenv from 'dotenv';
 import cors from 'cors';
-import sequelize from './config/database.js';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import dotenv from 'dotenv';
+
+// Import Sequelize instance and routes
+import sequelize from './config/database.js'; // Assuming models/index.js exports sequelize
+import webhookRouter from './routes/webhook.js';
 import authRoutes from './routes/authRoutes.js';
-import webhookRoutes from './routes/webhook.js';
 import wagerRoutes from './routes/wagers.js';
-import './models/associations.js'; // Import associations
-import  adminRoutes from './routes/admin.js'
+import adminRoutes from './routes/admin.js';
+import './models/associations.js'; // Ensure associations are loaded
+
 dotenv.config();
+
 const app = express();
+const PORT = process.env.PORT || 5000;
 
-// middleware
+// --- Middleware ---
+app.use(helmet());
+app.use(morgan('dev'));
 app.use(cors());
-app.use('/api/webhook', webhookRoutes);
-app.use(express.json());
 
-// sync database
-sequelize.sync({ alter: true })
-  .then(() => console.log('Database synced'))
-  .catch((err) => console.error('DB sync error:', err));
+// --- Body Parsers ---
+// The `express.json` middleware with the `verify` option MUST be placed before your routes
+// to ensure the raw body is captured before it's processed by the webhook handler.
+app.use(express.json({
+  verify: (req, res, buf, encoding) => {
+    if (req.originalUrl.startsWith('/api/webhook/paystack')) {
+      req.rawBody = buf.toString(encoding || 'utf8');
+    }
+  },
+}));
+app.use(express.urlencoded({ extended: true }));
 
-// mount routes
+// --- API Routes ---
+app.use('/api/webhook/paystack', webhookRouter);
 app.use('/api/auth', authRoutes);
 app.use('/api/wagers', wagerRoutes);
 app.use('/api/admin', adminRoutes);
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+// --- Root Route for Health Check ---
+app.get('/', (req, res) => {
+  res.send('Welcome to WagersMe API');
+});
+
+// --- Server & DB Initialization ---
+const startServer = async () => {
+  try {
+    await sequelize.sync({ alter: true });
+    console.log('Database connected and synced successfully.');
+    
+    app.listen(PORT, () => {
+      console.log(`Server is running on http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
