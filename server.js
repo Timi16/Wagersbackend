@@ -11,7 +11,7 @@ import authRoutes from './routes/authRoutes.js';
 import wagerRoutes from './routes/wagers.js';
 import adminRoutes from './routes/admin.js';
 import './models/associations.js'; // Ensure associations are loaded
-
+import paymentRoutes from './routes/paymentRoutes.js';
 dotenv.config();
 
 const app = express();
@@ -39,7 +39,7 @@ app.use('/api/webhook/paystack', webhookRouter);
 app.use('/api/auth', authRoutes);
 app.use('/api/wagers', wagerRoutes);
 app.use('/api/admin', adminRoutes);
-
+app.use('/api/payment', paymentRoutes);
 // --- Root Route for Health Check ---
 app.get('/', (req, res) => {
   res.send('Welcome to WagersMe API');

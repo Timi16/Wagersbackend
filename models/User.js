@@ -54,6 +54,18 @@ User.init({
     type: DataTypes.STRING,
     allowNull: true,
   },
+  bankAccountNumber: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  bankCode: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  paystackRecipientCode: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   totalBets: {
     type: DataTypes.INTEGER,
     defaultValue: 0,
