@@ -1,7 +1,7 @@
 import Bet from '../models/Bet.js';
 import Wager from '../models/Wager.js';
 import User from '../models/User.js';
-
+import Transaction from '../models/Transaction.js';
 export const placeBet = async (req, res) => {
     const wagerId = req.params.id; // Get wagerId from URL parameter
     const { choice, stake } = req.body; // Get choice and stake from request body
@@ -69,7 +69,14 @@ export const placeBet = async (req, res) => {
     } else {
       await wager.increment('noCount', { by: 1 });
     }
-
+    await Transaction.create({
+      userId: userId,
+      type: 'bet',
+      amount: -stake, // Negative for bet
+      status: 'completed',
+      wagerId: wagerId,
+      date: new Date(),
+    });
     return res.status(201).json({ message: 'Bet placed successfully', bet });
   } catch (err) {
     console.error('Place bet error:', err);

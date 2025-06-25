@@ -1,5 +1,6 @@
 import { getPaystackHeaders } from '../config/paystack.js';
 import User from '../models/User.js';
+import Transaction from '../models/Transaction.js';
 
 export const withdraw = async (req, res) => {
   const { amount } = req.body; // Amount in NGN
@@ -52,7 +53,14 @@ export const withdraw = async (req, res) => {
     }
 
     await user.decrement('balance', { by: amount });
-
+    await Transaction.create({
+      userId: user.id,
+      type: 'withdraw',
+      amount: -amount, // Negative for withdrawal
+      status: 'completed',
+      method: 'Bank Transfer',
+      date: new Date(),
+    });
     return res.status(200).json({ message: 'Withdrawal successful', transfer: transferData.data });
   } catch (err) {
     console.error('Withdraw error:', err);

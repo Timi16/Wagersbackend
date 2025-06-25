@@ -2,6 +2,7 @@
 import crypto from 'crypto';
 import { paystackConfig } from '../config/paystack.js';
 import User from '../models/User.js';
+import Transaction  from '../models/Transaction.js';
 
 /**
  * Verify Paystack webhook signature
@@ -109,7 +110,14 @@ const handleInflow = async (data) => {
     // Reload user to get updated balance
     await user.reload();
     const newBalance = parseFloat(user.balance);
-    
+    await Transaction.create({
+      userId: user.id,
+      type: 'deposit',
+      amount: amountInNaira,
+      status: 'completed',
+      method: 'Bank Transfer',
+      date: new Date(),
+    });
     console.log(`✅ Inflow successful!`);
     console.log(`👤 User: ${user.email} (ID: ${user.id})`);
     console.log(`💰 Amount: ${amountInNaira} NGN`);

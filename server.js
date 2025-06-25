@@ -12,6 +12,7 @@ import wagerRoutes from './routes/wagers.js';
 import adminRoutes from './routes/admin.js';
 import './models/associations.js'; // Ensure associations are loaded
 import paymentRoutes from './routes/paymentRoutes.js';
+import walletRoutes from './routes/walletRoutes.js';
 dotenv.config();
 
 const app = express();
@@ -40,6 +41,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/wagers', wagerRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/wallet', walletRoutes);
 // --- Root Route for Health Check ---
 app.get('/', (req, res) => {
   res.send('Welcome to WagersMe API');
