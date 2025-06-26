@@ -18,13 +18,10 @@ export const signup = async (req, res) => {
   const generateRandomPhone = () => {
     const prefixes = ['070', '080', '090', '081', '071', '091'];
     const randomPrefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-    
-    // Generate 8 random digits for the remaining part
     let remainingDigits = '';
     for (let i = 0; i < 8; i++) {
       remainingDigits += Math.floor(Math.random() * 10);
     }
-    
     return randomPrefix + remainingDigits;
   };
 
@@ -34,7 +31,7 @@ export const signup = async (req, res) => {
     // Create user in database
     const user = await User.create({ username, email, password });
 
-    // Create Paystack customer with generated lastName and phone number
+    // Create Paystack customer
     const customerResponse = await fetch('https://api.paystack.co/customer', {
       method: 'POST',
       headers: {
@@ -43,9 +40,9 @@ export const signup = async (req, res) => {
       },
       body: JSON.stringify({
         email: email,
-        first_name: username, // Using username as first name
+        first_name: username,
         last_name: lastName,
-        phone: phoneNumber, // Add the generated phone number
+        phone: phoneNumber,
       }),
     });
     const customerData = await customerResponse.json();
@@ -83,17 +80,23 @@ export const signup = async (req, res) => {
       virtualAccountName: virtualAccountName,
     });
 
-    // Send success response
+    // Generate JWT token
+    const secret = process.env.JWT_SECRET || 'mysecretkey';
+    const token = jwt.sign({ id: user.id }, secret, { expiresIn: '7d' });
+
+    // Send success response with token
     return res.status(201).json({
       message: 'Signup successful',
-      user: { 
-        id: user.id, 
-        username, 
-        email, 
+      user: {
+        id: user.id,
+        username,
+        email,
         customerCode,
         virtualAccountNumber,
         virtualAccountBank,
+        virtualAccountName,
       },
+      token, // Include token here
     });
   } catch (err) {
     console.error('Signup error:', err);
@@ -196,7 +199,12 @@ export const verifyToken = async (req, res) => {
 
 export const getProfile = async (req, res) => {
   try {
-    const user = req.user; 
+    // Fetch full user data from database to ensure all fields are present
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
     return res.status(200).json({
       id: user.id,
       username: user.username,
