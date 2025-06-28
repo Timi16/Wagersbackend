@@ -2,8 +2,26 @@ import { getPaystackHeaders } from '../config/paystack.js';
 import User from '../models/User.js';
 import Transaction from '../models/Transaction.js';
 
+export const getBanks = async (req, res) => {
+  try {
+    const response = await fetch('https://api.paystack.co/bank', {
+      method: 'GET',
+      headers: getPaystackHeaders(),
+    });
+    const data = await response.json();
+    if (data.status) {
+      return res.status(200).json(data.data);
+    } else {
+      return res.status(500).json({ message: 'Failed to fetch banks' });
+    }
+  } catch (err) {
+    console.error('Get banks error:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
 export const withdraw = async (req, res) => {
-  const { amount } = req.body; // Amount in NGN
+  const { amount, bankCode, accountNumber } = req.body;
   const userId = req.user.id;
 
   try {
@@ -16,27 +34,25 @@ export const withdraw = async (req, res) => {
       return res.status(400).json({ message: 'Insufficient balance' });
     }
 
-    let recipientCode = user.paystackRecipientCode;
-    if (!recipientCode) {
-      const recipientResponse = await fetch('https://api.paystack.co/transferrecipient', {
-        method: 'POST',
-        headers: getPaystackHeaders(),
-        body: JSON.stringify({
-          type: 'nuban',
-          name: user.username,
-          account_number: user.bankAccountNumber, // Add this field to User model
-          bank_code: user.bankCode, // Add this field to User model
-          currency: 'NGN',
-        }),
-      });
-      const recipientData = await recipientResponse.json();
-      if (!recipientData.status) {
-        return res.status(400).json({ message: 'Failed to create transfer recipient' });
-      }
-      recipientCode = recipientData.data.recipient_code;
-      await user.update({ paystackRecipientCode: recipientCode });
+    // Create a new transfer recipient with provided details
+    const recipientResponse = await fetch('https://api.paystack.co/transferrecipient', {
+      method: 'POST',
+      headers: getPaystackHeaders(),
+      body: JSON.stringify({
+        type: 'nuban',
+        name: user.username,
+        account_number: accountNumber,
+        bank_code: bankCode,
+        currency: 'NGN',
+      }),
+    });
+    const recipientData = await recipientResponse.json();
+    if (!recipientData.status) {
+      return res.status(400).json({ message: 'Failed to create transfer recipient: ' + recipientData.message });
     }
+    const recipientCode = recipientData.data.recipient_code;
 
+    // Initiate transfer
     const transferResponse = await fetch('https://api.paystack.co/transfer', {
       method: 'POST',
       headers: getPaystackHeaders(),
@@ -49,18 +65,22 @@ export const withdraw = async (req, res) => {
     });
     const transferData = await transferResponse.json();
     if (!transferData.status) {
-      return res.status(400).json({ message: 'Transfer failed' });
+      return res.status(400).json({ message: 'Transfer failed: ' + transferData.message });
     }
 
+    // Deduct from user's balance
     await user.decrement('balance', { by: amount });
+
+    // Record transaction
     await Transaction.create({
       userId: user.id,
       type: 'withdraw',
-      amount: -amount, // Negative for withdrawal
+      amount: -amount,
       status: 'completed',
       method: 'Bank Transfer',
       date: new Date(),
     });
+
     return res.status(200).json({ message: 'Withdrawal successful', transfer: transferData.data });
   } catch (err) {
     console.error('Withdraw error:', err);
