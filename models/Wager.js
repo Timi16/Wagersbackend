@@ -81,6 +81,14 @@ Wager.init({
     type: DataTypes.INTEGER,
     defaultValue: 0,
   },
+  totalYesStake: {
+    type: DataTypes.DECIMAL(12, 2),
+    defaultValue: 0.00,
+  },
+  totalNoStake: {
+    type: DataTypes.DECIMAL(12, 2),
+    defaultValue: 0.00,
+  },
   status: {
     type: DataTypes.ENUM('active', 'closed', 'resolved', 'cancelled'),
     defaultValue: 'active',
@@ -101,7 +109,6 @@ Wager.init({
     type: DataTypes.DATE,
     allowNull: true,
   },
-
 }, {
   sequelize,
   modelName: 'Wager',
