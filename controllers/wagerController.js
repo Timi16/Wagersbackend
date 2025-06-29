@@ -2,13 +2,8 @@ import Wager from '../models/Wager.js';
 import User from '../models/User.js';
 import Bet from '../models/Bet.js';
 import Commission from '../models/Commission.js';
-// Import Commission model if you have it, or remove the Commission.create call
-// import Commission from '../models/Commission.js';
 import { Op } from 'sequelize';
 
-/**
- * Create a new wager
- */
 export const createWager = async (req, res) => {
   if (!req.body || typeof req.body !== 'object') {
     return res.status(400).json({ message: 'Invalid request body' });
@@ -26,7 +21,6 @@ export const createWager = async (req, res) => {
     maxStake,
   } = req.body;
 
-  // Validation
   if (!title || !description || !category || !deadline) {
     return res.status(400).json({ 
       message: 'Required fields: title, description, category, deadline' 
@@ -70,7 +64,7 @@ export const createWager = async (req, res) => {
       minStake: stakeType === 'open' ? minStake : null,
       maxStake: stakeType === 'open' ? maxStake : null,
       createdBy: req.user.id,
-      status: 'active', // Set wager to active by default
+      status: 'active',
     });
 
     const wagerWithCreator = await Wager.findByPk(wager.id, {
@@ -91,9 +85,6 @@ export const createWager = async (req, res) => {
   }
 };
 
-/**
- * Get all active wagers
- */
 export const getWagers = async (req, res) => {
   try {
     const { category, status, page = 1, limit = 10 } = req.query;
@@ -132,9 +123,6 @@ export const getWagers = async (req, res) => {
   }
 };
 
-/**
- * Get single wager by ID
- */
 export const getWager = async (req, res) => {
   try {
     const { id } = req.params;
@@ -151,6 +139,27 @@ export const getWager = async (req, res) => {
       return res.status(404).json({ message: 'Wager not found' });
     }
 
+    const commissionRate = 0.10;
+    const distributablePool = wager.totalPool * (1 - commissionRate);
+
+    // Calculate odds multipliers
+    wager.dataValues.multiplierYes = wager.totalYesStake > 0 ? distributablePool / wager.totalYesStake : null;
+    wager.dataValues.multiplierNo = wager.totalNoStake > 0 ? distributablePool / wager.totalNoStake : null;
+
+    // Calculate predicted winnings for the authenticated user
+    if (req.user) {
+      const bet = await Bet.findOne({ where: { wagerId: id, userId: req.user.id } });
+      if (bet) {
+        const totalStakeOnChoice = bet.choice === 'yes' ? wager.totalYesStake : wager.totalNoStake;
+        if (totalStakeOnChoice > 0) {
+          const predictedWinnings = (bet.stake / totalStakeOnChoice) * distributablePool;
+          wager.dataValues.predictedWinnings = Number(predictedWinnings.toFixed(2));
+        } else {
+          wager.dataValues.predictedWinnings = distributablePool; // If only one bettor on this side
+        }
+      }
+    }
+
     return res.status(200).json({ wager });
   } catch (err) {
     console.error('Get wager error:', err);
@@ -158,9 +167,6 @@ export const getWager = async (req, res) => {
   }
 };
 
-/**
- * Update wager
- */
 export const updateWager = async (req, res) => {
   try {
     const { id } = req.params;
@@ -204,9 +210,6 @@ export const updateWager = async (req, res) => {
   }
 };
 
-/**
- * Delete/Cancel wager
- */
 export const deleteWager = async (req, res) => {
   try {
     const { id } = req.params;
@@ -235,9 +238,6 @@ export const deleteWager = async (req, res) => {
   }
 };
 
-/**
- * Get wagers by category
- */
 export const getWagersByCategory = async (req, res) => {
   try {
     const { category } = req.params;
@@ -278,12 +278,9 @@ export const getWagersByCategory = async (req, res) => {
   }
 };
 
-/**
- * Resolve a wager and distribute winnings
- */
 export const resolveWager = async (req, res) => {
   const { id } = req.params;
-  const { result } = req.body; // 'yes', 'no', or 'cancelled'
+  const { result } = req.body;
 
   if (!['yes', 'no', 'cancelled'].includes(result)) {
     return res.status(400).json({ message: 'Invalid result' });
@@ -298,7 +295,6 @@ export const resolveWager = async (req, res) => {
       return res.status(400).json({ message: 'Wager is not active' });
     }
     
-    // FIXED: Check if user has admin role
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Only an admin can resolve this wager' });
     }
@@ -320,24 +316,19 @@ export const resolveWager = async (req, res) => {
     }
 
     const totalPool = wager.totalPool;
-    const commission = totalPool * 0.10; // 10% commission
+    const commission = totalPool * 0.10;
     const distributablePool = totalPool - commission;
 
-    // Pay commission to the resolving admin's balance
     const admin = await User.findByPk(req.user.id);
     if (admin) {
       await admin.increment('balance', { by: commission });
     }
 
-    // FIXED: Only create Commission record if you have the model
-    // Comment out or remove if you don't have a Commission model
-    
     await Commission.create({
       wagerId: wager.id,
       amount: commission,
-      userId: req.user.id, // Log which admin received it
+      userId: req.user.id,
     });
-    
 
     const winningChoice = result;
     const winningBets = await Bet.findAll({
@@ -351,7 +342,7 @@ export const resolveWager = async (req, res) => {
       return res.status(200).json({ message: 'Wager resolved with no winners' });
     }
 
-    const totalWinningStake = winningBets.reduce((sum, bet) => sum + bet.stake, 0);
+    const totalWinningStake = result === 'yes' ? wager.totalYesStake : wager.totalNoStake;
 
     for (const bet of winningBets) {
       const user = await User.findByPk(bet.userId);
