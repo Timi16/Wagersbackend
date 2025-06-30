@@ -16,13 +16,13 @@ const router = express.Router();
 // Public routes
 router.get('/', getWagers);
 router.get('/category/:category', getWagersByCategory);
-router.get('/:id(\\d+)', getWager);
+router.get('/:id', getWager);
 
 // Protected routes
 router.post('/', authenticateToken, createWager);
-router.put('/:id(\\d+)', authenticateToken, updateWager);
-router.delete('/:id(\\d+)', authenticateToken, deleteWager);
-router.post('/:id(\\d+)/bet', authenticateToken, placeBet);
-router.post('/:id(\\d+)/resolve', authenticateToken, resolveWager);
+router.put('/:id', authenticateToken, updateWager);
+router.delete('/:id', authenticateToken, deleteWager);
+router.post('/:id/bet', authenticateToken, placeBet);
+router.post('/:id/resolve', authenticateToken, resolveWager);
 
 export default router;
