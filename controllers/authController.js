@@ -91,6 +91,7 @@ export const signup = async (req, res) => {
         id: user.id,
         username,
         email,
+        role: user.role,
         customerCode,
         virtualAccountNumber,
         virtualAccountBank,
@@ -139,6 +140,7 @@ export const signin = async (req, res) => {
       id: user.id,
       username: user.username,
       email: user.email,
+      role: user.role,
       token
     });
   } catch (err) {
@@ -181,7 +183,8 @@ export const verifyToken = async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        role: user.role,
       }
     });
   } catch (err) {

@@ -315,9 +315,22 @@ export const resolveWager = async (req, res) => {
       return res.status(200).json({ message: 'Wager cancelled and stakes refunded' });
     }
 
-    const totalPool = wager.totalPool;
-    const commission = totalPool * 0.10;
-    const distributablePool = totalPool - commission;
+    // FIXED: Calculate total pool correctly from actual stakes
+    const totalYesStake = parseFloat(wager.totalYesStake || 0);
+    const totalNoStake = parseFloat(wager.totalNoStake || 0);
+    const actualTotalPool = totalYesStake + totalNoStake;
+    
+    // Use actual total pool instead of stored totalPool (which might be wrong)
+    const commission = actualTotalPool * 0.10;
+    const distributablePool = actualTotalPool - commission;
+
+    console.log('=== COMMISSION DEBUG ===');
+    console.log('Total Yes Stake:', totalYesStake);
+    console.log('Total No Stake:', totalNoStake);
+    console.log('Actual Total Pool:', actualTotalPool);
+    console.log('Stored Total Pool:', wager.totalPool);
+    console.log('Commission (10%):', commission);
+    console.log('Distributable Pool:', distributablePool);
 
     const admin = await User.findByPk(req.user.id);
     if (admin) {
@@ -330,29 +343,37 @@ export const resolveWager = async (req, res) => {
       userId: req.user.id,
     });
 
-    const winningChoice = result;
     const winningBets = await Bet.findAll({
       where: {
         wagerId: id,
-        choice: winningChoice,
+        choice: result,
       },
     });
 
+    // Since there will always be winners, this should never happen
     if (winningBets.length === 0) {
       return res.status(200).json({ message: 'Wager resolved with no winners' });
     }
 
-    const totalWinningStake = result === 'yes' ? wager.totalYesStake : wager.totalNoStake;
+    const totalWinningStake = result === 'yes' ? totalYesStake : totalNoStake;
 
     for (const bet of winningBets) {
       const user = await User.findByPk(bet.userId);
       if (user) {
-        const winnings = (bet.stake / totalWinningStake) * distributablePool;
+        const winnings = (parseFloat(bet.stake) / totalWinningStake) * distributablePool;
         await user.increment('balance', { by: winnings });
       }
     }
 
-    return res.status(200).json({ message: 'Wager resolved and winnings distributed' });
+    return res.status(200).json({ 
+      message: 'Wager resolved and winnings distributed',
+      debug: {
+        actualTotalPool,
+        storedTotalPool: wager.totalPool,
+        commission,
+        distributablePool
+      }
+    });
   } catch (err) {
     console.error('Resolve wager error:', err);
     return res.status(500).json({ message: 'Server error' });
